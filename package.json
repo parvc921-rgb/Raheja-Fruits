@@ -1,0 +1,19 @@
+{
+  "name": "raheja-fruits",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev:customer": "pnpm --filter customer dev",
+    "dev:admin": "pnpm --filter admin dev",
+    "build:shared": "pnpm --filter @raheja/shared build",
+    "build:customer": "pnpm --filter customer build",
+    "build:admin": "pnpm --filter admin build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "seed": "pnpm --filter scripts run seed",
+    "emulators": "firebase emulators:start --import=./.firebase-data --export-on-exit"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* sage-white background, deep forest text — not the AI-default cream */
+  --background: 90 30% 97%;
+  --foreground: 150 20% 13%;
+  --card: 0 0% 100%;
+
+  /* leaf green — primary CTAs, member price */
+  --primary: 150 45% 27%;
+  --primary-foreground: 0 0% 100%;
+
+  --muted: 90 18% 93%;
+  --muted-foreground: 150 10% 40%;
+  --border: 90 15% 87%;
+
+  /* ripe mango — used ONLY for the savings stamp, nowhere else */
+  --accent: 32 78% 51%;
+  --accent-foreground: 0 0% 100%;
+
+  /* berry — out of stock / alerts */
+  --berry: 352 48% 45%;
+  --berry-foreground: 0 0% 100%;
+
+  --radius: 0.75rem;
+}
+
+body {
+  font-variant-numeric: tabular-nums;
+}

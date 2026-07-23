@@ -1,0 +1,13 @@
+{
+  "projects": {
+    "default": "raheja-fruits"
+  },
+  "targets": {
+    "raheja-fruits": {
+      "hosting": {
+        "customer": ["raheja-fruits-customer"],
+        "admin": ["raheja-fruits-admin"]
+      }
+    }
+  }
+}

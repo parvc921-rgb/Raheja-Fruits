@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 220 15% 15%;
+  --card: 0 0% 100%;
+  --primary: 140 45% 28%;
+  --primary-foreground: 0 0% 100%;
+  --muted: 220 15% 96%;
+  --muted-foreground: 220 8% 45%;
+  --border: 220 15% 90%;
+
+  /* amber — secondary emphasis (e.g. "packed"/"out for delivery" badges) */
+  --accent: 32 78% 51%;
+  --accent-foreground: 0 0% 100%;
+
+  /* berry — out of stock / destructive / alert states */
+  --berry: 352 48% 45%;
+  --berry-foreground: 0 0% 100%;
+
+  --radius: 0.5rem;
+}

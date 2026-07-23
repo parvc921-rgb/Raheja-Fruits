@@ -1,0 +1,152 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.isActive == true;
+    }
+
+    function adminRole() {
+      return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role;
+    }
+
+    function hasAdminRole(roles) {
+      return isAdmin() && adminRole() in roles;
+    }
+
+    function isOwnCustomerDoc(customerId) {
+      return isSignedIn() && request.auth.uid == customerId;
+    }
+
+    function isActiveCustomer() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/customers/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/customers/$(request.auth.uid)).data.status == "active";
+    }
+
+    // --- buildings: readable by any signed-in customer (for the address
+    // dropdown), writable only by admins. Wings live in a subcollection
+    // (buildings/{buildingId}/wings) rather than an array field, so they
+    // get their own nested match with the same read/write policy. ---
+    match /buildings/{buildingId} {
+      allow read: if isSignedIn();
+      allow create: if hasAdminRole(["super_admin", "operations"]);
+      // Deactivating a building (isActive -> false) is restricted to
+      // super_admin, same narrower-role-for-the-more-destructive-action
+      // pattern as fruits' update rule below.
+      allow update: if hasAdminRole(["super_admin", "operations"]) &&
+        (request.resource.data.isActive != false || hasAdminRole(["super_admin"]));
+      allow delete: if false; // soft delete only
+
+      match /wings/{wingId} {
+        allow read: if isSignedIn();
+        allow create: if hasAdminRole(["super_admin", "operations"]);
+        allow update: if hasAdminRole(["super_admin", "operations"]) &&
+          (request.resource.data.active != false || hasAdminRole(["super_admin"]));
+        allow delete: if false; // soft delete only
+      }
+    }
+
+    // --- customers: a customer may read/update only their own profile,
+    // and may never write pinHash or status directly (those are managed
+    // server-side via Cloud Functions using the Admin SDK, which bypasses
+    // these rules by design). Admins have broader access for support/
+    // management. ---
+    match /customers/{customerId} {
+      allow read: if isOwnCustomerDoc(customerId) || isAdmin();
+      allow update: if isOwnCustomerDoc(customerId) &&
+        !("pinHash" in request.resource.data.diff(resource.data).affectedKeys()) &&
+        !("status" in request.resource.data.diff(resource.data).affectedKeys());
+      allow create, delete: if isAdmin(); // registration happens via the
+        // registerCustomer Cloud Function using the Admin SDK; this rule
+        // exists for admin-side manual management only.
+    }
+
+    // --- fruits: any active customer can read the catalogue; only
+    // procurement/super_admin roles can write prices/availability. ---
+    match /fruits/{fruitId} {
+      allow read: if isActiveCustomer() || isAdmin();
+      allow create: if hasAdminRole(["super_admin", "procurement"]);
+      // Milestone 2: soft delete only. Any super_admin/procurement admin
+      // can create/edit a fruit, but only super_admin can flip isActive
+      // to false (deactivate) — mirrors the narrower role the old
+      // deleteFruit Cloud Function required for the more destructive
+      // action. Deactivating is still just an update, never a delete.
+      allow update: if hasAdminRole(["super_admin", "procurement"]) &&
+        (request.resource.data.isActive != false || hasAdminRole(["super_admin"]));
+      allow delete: if false; // never a hard delete from the client — see isActive above
+    }
+
+    // --- orders: a customer can read only their own orders and CREATE
+    // one (via a Server Action, which re-validates cutoff/min-order/
+    // pricing server-side before this rule is even reached in practice,
+    // since order creation goes through the Admin SDK). Customers can
+    // NEVER update or delete an order once created — enforces "no
+    // cancellation" at the data layer, not just the UI. Admins can
+    // update status transitions (packed -> out_for_delivery -> etc). ---
+    match /orders/{orderId} {
+      allow read: if (isSignedIn() && resource.data.customerId == request.auth.uid) || isAdmin();
+      allow create: if false; // order creation is server-side only (Admin SDK)
+      allow update: if false; // status transitions go through updateOrderStatus (Cloud
+        // Function), which validates the transition and writes an audit log entry —
+        // never a direct client write, even for admins.
+      allow delete: if false; // orders are never deleted, only status-transitioned
+    }
+
+    // --- admins: only super_admin can manage other admin accounts;
+    // an admin can read their own doc to determine their role client-side. ---
+    match /admins/{adminId} {
+      allow read: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow write: if hasAdminRole(["super_admin"]);
+    }
+
+    // --- auditLog: append-only. Most entries are written server-side
+    // (Admin SDK / Cloud Function triggers), but Milestone 2's fruit
+    // CRUD writes its audit entries directly from the admin client, so
+    // creates are allowed for any active admin — the actorId check
+    // stops one admin from logging an entry under another admin's
+    // identity. Never client-updatable or deletable. ---
+    match /auditLog/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.actorId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // --- loginAttempts: PIN lockout counters, written only by the
+    // verifyPin Cloud Function via the Admin SDK (which bypasses these
+    // rules). Never client-readable/writable — exposing failedAttempts
+    // would let an attacker probe the lockout threshold. ---
+    match /loginAttempts/{customerId} {
+      allow read, write: if false;
+    }
+
+    // --- settings: business-wide configuration (single doc,
+    // settings/business). super_admin only, both read and write — even
+    // other admin roles get Forbidden, since this includes GST/invoice
+    // numbering and other operationally-sensitive fields. Cloud Functions
+    // and Server Actions read it via the Admin SDK regardless, bypassing
+    // this rule entirely — this only governs direct client reads. ---
+    match /settings/business {
+      allow read, write: if hasAdminRole(["super_admin"]);
+    }
+
+    // --- settings/public: a customer-safe mirror of the fields above
+    // (minimum order, delivery charge, maintenance mode, ...) — see
+    // PublicBusinessSettings in packages/shared/src/types. Readable by
+    // anyone, even signed-out visitors (a maintenance banner should work
+    // before login too), written only when an admin saves Business
+    // Settings (apps/admin/src/lib/settings.ts writes both docs in one
+    // batch, so they can never drift out of sync with each other). ---
+    match /settings/public {
+      allow read: if true;
+      allow write: if hasAdminRole(["super_admin"]);
+    }
+  }
+}

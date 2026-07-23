@@ -1,0 +1,36 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAdmin() {
+      return request.auth != null &&
+        firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid)) &&
+        firestore.get(/databases/(default)/documents/admins/$(request.auth.uid)).data.isActive == true;
+    }
+
+    // Fruit photos are shown in the public-ish customer catalogue (any
+    // active customer can see them), so read is open — there's nothing
+    // sensitive in a produce photo. Writes are admin-only, and capped
+    // at 5MB to keep the catalogue snappy on mobile data.
+    match /fruits/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin() && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Milestone 2: fruit photos live at fruit-images/{fruitId} — one
+    // file per fruit document, keyed by its own Firestore ID, so
+    // re-uploading overwrites rather than orphans the old photo.
+    match /fruit-images/{fruitId} {
+      allow read: if true;
+      allow write: if isAdmin() && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Deny everything else by default.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
