@@ -9,7 +9,8 @@ out/
 # production
 build/
 dist/
-lib/
+/packages/shared/lib/
+/functions/lib/
 
 # env
 .env
