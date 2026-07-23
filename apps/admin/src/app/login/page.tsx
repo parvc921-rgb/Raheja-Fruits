@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,7 +14,18 @@ const ERROR_MESSAGES: Record<string, string> = {
   forbidden: "You don't have permission to view that page.",
 };
 
+// useSearchParams() requires a Suspense boundary somewhere above it for
+// Next.js's static build step — this default export is just that
+// boundary; all the actual page logic lives in AdminLoginForm below.
 export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminLoginForm />
+    </Suspense>
+  );
+}
+
+function AdminLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, admin, loading: authLoading } = useAuth();

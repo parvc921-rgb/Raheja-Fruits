@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useRequireAuth } from "@/hooks/use-require-auth";
@@ -7,7 +8,18 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCustomerOrders } from "@/lib/orders";
 import { OrderCard } from "@/components/orders/order-card";
 
+// useSearchParams() requires a Suspense boundary somewhere above it for
+// Next.js's static build step — this default export is just that
+// boundary; all the actual page logic lives in OrdersContent below.
 export default function OrdersPage() {
+  return (
+    <Suspense fallback={<p className="px-4 py-6 text-sm text-muted-foreground">Loading…</p>}>
+      <OrdersContent />
+    </Suspense>
+  );
+}
+
+function OrdersContent() {
   const { loading: authLoading } = useRequireAuth();
   const { user } = useAuth();
   const { orders, loading: ordersLoading } = useCustomerOrders(user);
