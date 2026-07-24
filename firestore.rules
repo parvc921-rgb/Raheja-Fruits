@@ -64,7 +64,7 @@ service cloud.firestore {
       allow update: if isOwnCustomerDoc(customerId) &&
         !("pinHash" in request.resource.data.diff(resource.data).affectedKeys()) &&
         !("status" in request.resource.data.diff(resource.data).affectedKeys());
-      allow create, delete: if isAdmin(); // registration happens via the
+      allow create, delete: if hasAdminRole(["super_admin", "operations"]); // registration happens via the
         // registerCustomer Cloud Function using the Admin SDK; this rule
         // exists for admin-side manual management only.
     }
@@ -114,7 +114,7 @@ service cloud.firestore {
     // stops one admin from logging an entry under another admin's
     // identity. Never client-updatable or deletable. ---
     match /auditLog/{logId} {
-      allow read: if isAdmin();
+      allow read: if hasAdminRole(["super_admin", "read_only"]);
       allow create: if isAdmin() && request.resource.data.actorId == request.auth.uid;
       allow update, delete: if false;
     }

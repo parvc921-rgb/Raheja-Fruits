@@ -333,7 +333,11 @@ export default function RegisterPage() {
               onChange={(e) => setAcceptedTerms(e.target.checked)}
               className="mt-0.5"
             />
-            I agree to Raheja Fruits' Terms of Service.
+            I agree to Raheja Fruits'{" "}
+            <Link href="/terms" target="_blank" className="underline">
+              Terms of Service
+            </Link>
+            .
           </label>
           {addressError && <p className="text-sm text-red-600">{addressError}</p>}
           <button

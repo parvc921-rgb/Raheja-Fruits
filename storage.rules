@@ -9,13 +9,23 @@ service firebase.storage {
         firestore.get(/databases/(default)/documents/admins/$(request.auth.uid)).data.isActive == true;
     }
 
+    function hasAdminRole(roles) {
+      return isAdmin() &&
+        firestore.get(/databases/(default)/documents/admins/$(request.auth.uid)).data.role in roles;
+    }
+
     // Fruit photos are shown in the public-ish customer catalogue (any
     // active customer can see them), so read is open — there's nothing
-    // sensitive in a produce photo. Writes are admin-only, and capped
-    // at 5MB to keep the catalogue snappy on mobile data.
+    // sensitive in a produce photo. Writes are restricted to the same
+    // roles that can write a fruit document in Firestore (super_admin,
+    // procurement) — not just "any active admin" — so a read_only or
+    // operations admin can't overwrite a fruit's photo directly via the
+    // Storage API even though they'd never see the upload control in
+    // the actual admin UI. Capped at 5MB to keep the catalogue snappy
+    // on mobile data.
     match /fruits/{allPaths=**} {
       allow read: if true;
-      allow write: if isAdmin() && request.resource.size < 5 * 1024 * 1024
+      allow write: if hasAdminRole(["super_admin", "procurement"]) && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
 
@@ -24,7 +34,7 @@ service firebase.storage {
     // re-uploading overwrites rather than orphans the old photo.
     match /fruit-images/{fruitId} {
       allow read: if true;
-      allow write: if isAdmin() && request.resource.size < 5 * 1024 * 1024
+      allow write: if hasAdminRole(["super_admin", "procurement"]) && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
 
